@@ -25,6 +25,8 @@ class TradeEngine:
     def __init__(self):
         self.prices = []
         self.last_buy_price = None  # Track last buy price to prevent repeat buys
+        self.short_ema = None  # Store latest short EMA
+        self.long_ema = None  # Store latest long EMA
 
     def update_price(self, price):
         """Add new price data and maintain rolling window"""
@@ -38,17 +40,17 @@ class TradeEngine:
             print("⏳ Waiting for more price data (Need 16+ price points)")
             return "HOLD"
 
-        short_ema = sum(self.prices[-8:]) / 8  # Short-term EMA (Increased for better filtering)
-        long_ema = sum(self.prices[-16:]) / 16  # Long-term EMA (Increased for better filtering)
+        self.short_ema = sum(self.prices[-8:]) / 8  # Short-term EMA (Smoother filter)
+        self.long_ema = sum(self.prices[-16:]) / 16  # Long-term EMA (Smoother filter)
 
-        print(f"📊 Short EMA: {short_ema:.2f}, Long EMA: {long_ema:.2f}")
+        print(f"📊 Short EMA: {self.short_ema:.2f}, Long EMA: {self.long_ema:.2f}")
 
         # Prevent repeat buys at the same price (Require 0.1% increase before re-buying)
-        if short_ema > long_ema and (self.last_buy_price is None or self.prices[-1] > self.last_buy_price * 1.001):
+        if self.short_ema > self.long_ema and (self.last_buy_price is None or self.prices[-1] > self.last_buy_price * 1.001):
             self.last_buy_price = self.prices[-1]  # Store last buy price
             print("✅ BUY Signal Generated")
             return "BUY"
-        elif short_ema < long_ema:
+        elif self.short_ema < self.long_ema:
             print("❌ SELL Signal Generated")
             return "SELL"
         else:
@@ -65,7 +67,7 @@ class PaperTradeSimulator:
         self.wins = 0
         self.losses = 0
 
-    def execute_trade(self, signal, price):
+    def execute_trade(self, signal, price, short_ema, long_ema):
         """Simulate trade execution"""
         print(f"🔍 Checking Trade Execution: Signal={signal}, Price={price}")
 
@@ -121,7 +123,7 @@ def trade_dashboard(stdscr, market, strategy, simulator):
         if price:
             strategy.update_price(price)
             signal = strategy.generate_signal()
-            trade_message = simulator.execute_trade(signal, price)
+            trade_message = simulator.execute_trade(signal, price, strategy.short_ema, strategy.long_ema)
 
         # Draw UI
         stdscr.addstr(1, 2, "🚀 Crypto Paper Trading Bot", curses.A_BOLD)
